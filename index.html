@@ -3,133 +3,29 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Aks — Interactive AR</title>
+  <title>Aks</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-  <style>
-    body { margin: 0; overflow: hidden; font-family: sans-serif; }
-    #overlay {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.85);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      z-index: 9999; color: #fff; text-align: center; padding: 20px; box-sizing: border-box;
-    }
-    #startBtn {
-      padding: 14px 32px; font-size: 16px; font-weight: bold;
-      color: #000; background: #d4af37; border: none; border-radius: 8px;
-      cursor: pointer; margin-top: 16px;
-    }
-    #status {
-      position: fixed; top: 10px; left: 10px; right: 10px;
-      background: rgba(0, 0, 0, 0.65); color: #fff; font-size: 12px;
-      padding: 6px 10px; border-radius: 6px; z-index: 9998; text-align: center;
-      pointer-events: none;
-    }
-  </style>
 </head>
 <body>
-  <div id="status">Loading video...</div>
-
-  <div id="overlay">
-    <div id="overlayText">Aks Interactive AR</div>
-    <button id="startBtn">TAP TO START AR</button>
-  </div>
-
-  <a-scene 
-    mindar-image="imageTargetSrc: ./targets.mind; filterMinCF: 0.0001; filterBeta: 0.001;" 
-    vr-mode-ui="enabled: false" 
-    xr-mode-ui="enabled: false" 
-    device-orientation-permission-ui="enabled: false">
-    
-    <a-assets timeout="60000">
-      <video 
-        id="aksVideo" 
-        src="./video.mp4" 
-        preload="auto" 
-        loop="true" 
-        playsinline 
-        webkit-playsinline 
-        muted>
-      </video>
+  <a-scene mindar-image="imageTargetSrc: ./targets.mind;" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+    <a-assets>
+      <video id="aksVideo" src="./video.mp4" preload="auto" playsinline webkit-playsinline muted crossorigin="anonymous"></video>
     </a-assets>
-
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
     <a-entity id="aksTarget" mindar-image-target="targetIndex: 0">
-      <a-plane 
-        id="aksPlane" 
-        src="#aksVideo" 
-        material="shader: flat; src: #aksVideo" 
-        position="0 0 0" 
-        width="1" 
-        height="1.389" 
-        rotation="0 0 0">
-      </a-plane>
+      <a-video id="aksPlane" src="#aksVideo" position="0 0 0" width="1" height="1.5" rotation="0 0 0"></a-video>
     </a-entity>
   </a-scene>
-
   <script>
-    var video = document.getElementById("aksVideo");
-    var plane = document.getElementById("aksPlane");
-    var target = document.getElementById("aksTarget");
-    var overlay = document.getElementById("overlay");
-    var startBtn = document.getElementById("startBtn");
-    var statusBox = document.getElementById("status");
-
-    function fitPlane() {
-      if (video.videoWidth > 0 && video.videoHeight > 0) {
-        plane.setAttribute("height", video.videoHeight / video.videoWidth);
-        statusBox.textContent = "Ready (" + video.videoWidth + "x" + video.videoHeight + ") — Point at poster";
-      }
-    }
-
-    video.addEventListener("loadedmetadata", fitPlane);
-    video.addEventListener("loadeddata", fitPlane);
-
-    video.addEventListener("error", function () {
-      statusBox.textContent = "Video Error: Resolution or format not supported on mobile";
-    });
-
-    startBtn.addEventListener("click", function () {
-      overlay.style.display = "none";
-      video.muted = true;
-      video.play().then(function () {
-        video.pause();
-        video.currentTime = 0;
-        fitPlane();
-      }).catch(function (err) {
-        statusBox.textContent = "Buffering video... point at poster";
-      });
-    });
-
-    target.addEventListener("targetFound", function () {
-      fitPlane();
-      video.muted = true;
-      video.currentTime = 0;
-      var playPromise = video.play();
-      if (playPromise !== undefined) {
-        playPromise.then(function () {
-          statusBox.textContent = "Playing (" + video.videoWidth + "x" + video.videoHeight + ")";
-          var mesh = plane.getObject3D("mesh");
-          if (mesh && mesh.material && mesh.material.map) {
-            mesh.material.map.needsUpdate = true;
-          }
-        }).catch(function (e) {
-          statusBox.textContent = "Tap screen once to play video";
-        });
-      }
-    });
-
-    target.addEventListener("targetLost", function () {
-      video.pause();
-      statusBox.textContent = "Point camera at poster";
-    });
-
-    document.body.addEventListener("click", function () {
-      if (overlay.style.display === "none" && video.paused) {
-        video.muted = true;
-        video.play();
-      }
+    window.addEventListener("load", function () {
+      var video = document.getElementById("aksVideo");
+      var plane = document.getElementById("aksPlane");
+      var target = document.getElementById("aksTarget");
+      function fit() { plane.setAttribute("height", video.videoHeight / video.videoWidth); }
+      if (video.readyState >= 1) { fit(); } else { video.addEventListener("loadedmetadata", fit); }
+      target.addEventListener("targetFound", function () { video.currentTime = 0; video.play(); });
+      target.addEventListener("targetLost", function () { video.pause(); });
     });
   </script>
 </body>
