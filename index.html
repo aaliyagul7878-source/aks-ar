@@ -2,30 +2,244 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Aks</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Aks — Interactive AR</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+    #overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(8, 8, 8, 0.94);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 9999; color: #fff; text-align: center; padding: 24px; box-sizing: border-box;
+    }
+    #title { font-size: 24px; letter-spacing: 6px; margin-bottom: 10px; color: #d4af37; }
+    #subtitle { font-size: 11px; letter-spacing: 2.5px; color: #aaa; margin-bottom: 32px; text-transform: uppercase; }
+    #startBtn {
+      padding: 14px 36px; font-size: 13px; letter-spacing: 2px; font-weight: bold;
+      color: #000; background: #d4af37; border: none; border-radius: 4px;
+      cursor: pointer; text-transform: uppercase;
+    }
+  </style>
+  <script>
+    // Custom Shader: Makes black background transparent so calligraphy floats in 3D
+    AFRAME.registerShader("luma-key", {
+      schema: {
+        src: { type: "map", is: "uniform" },
+        threshold: { type: "number", is: "uniform", default: 0.07 },
+        softness: { type: "number", is: "uniform", default: 0.08 },
+        opacity: { type: "number", is: "uniform", default: 1.0 }
+      },
+      vertexShader: [
+        "varying vec2 vUv;",
+        "void main() {",
+        "  vUv = uv;",
+        "  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);",
+        "}"
+      ].join("\n"),
+      fragmentShader: [
+        "uniform sampler2D src;",
+        "uniform float threshold;",
+        "uniform float softness;",
+        "uniform float opacity;",
+        "varying vec2 vUv;",
+        "void main() {",
+        "  vec4 tex = texture2D(src, vUv);",
+        "  float luma = max(max(tex.r, tex.g), tex.b);",
+        "  float alpha = smoothstep(threshold, threshold + softness, luma) * opacity;",
+        "  gl_FragColor = vec4(tex.rgb, alpha);",
+        "}"
+      ].join("\n")
+    });
+  </script>
 </head>
 <body>
-  <a-scene mindar-image="imageTargetSrc: ./targets.mind;" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
-    <a-assets>
-      <video id="aksVideo" src="./video.mp4" preload="auto" playsinline webkit-playsinline muted crossorigin="anonymous"></video>
+  <div id="overlay">
+    <div id="title">AKS</div>
+    <div id="subtitle">A Journey From Outer Form To Inner Truth</div>
+    <button id="startBtn">Tap to Begin</button>
+  </div>
+
+  <a-scene 
+    pose-stabilizer
+    mindar-image="imageTargetSrc: ./targets.mind; filterMinCF: 0.001; filterBeta: 0.01; warmupTolerance: 5; missTolerance: 10; uiScanning: no; uiLoading: no;" 
+    color-space="sRGB"
+    renderer="colorManagement: true; precision: mediump; antialias: false; powerPreference: high-performance;"
+    vr-mode-ui="enabled: false" 
+    xr-mode-ui="enabled: false" 
+    device-orientation-permission-ui="enabled: false">
+    
+    <a-assets timeout="60000">
+      <video 
+        id="aksVideo" 
+        src="./video.mp4" 
+        preload="auto" 
+        playsinline 
+        webkit-playsinline 
+        muted>
+      </video>
     </a-assets>
+
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-    <a-entity id="aksTarget" mindar-image-target="targetIndex: 0">
-      <a-video id="aksPlane" src="#aksVideo" position="0 0 0" width="1" height="1.5" rotation="0 0 0"></a-video>
+
+    <!-- Invisible raw tracker -->
+    <a-entity id="aksTarget" mindar-image-target="targetIndex: 0"></a-entity>
+
+    <!-- Stabilized 3D Multi-Layer Container -->
+    <a-entity id="smoothContainer" visible="false">
+      <!-- Layer 1 (Z = 0): Dark backdrop on the poster surface to hide the static print underneath -->
+      <a-plane 
+        id="basePlane"
+        color="#050505" 
+        opacity="0.92"
+        material="shader: flat; transparent: true;" 
+        position="0 0 0" 
+        width="1" 
+        height="1.4278">
+      </a-plane>
+
+      <!-- Layer 2 (Z = 0.08): Main floating 3D calligraphy & particles -->
+      <a-plane 
+        id="aksPlane" 
+        material="shader: luma-key; src: #aksVideo; transparent: true; threshold: 0.07; softness: 0.08; opacity: 1.0; depthWrite: false;" 
+        position="0 0 0.08" 
+        width="1" 
+        height="1.4278">
+      </a-plane>
+
+      <!-- Layer 3 (Z = 0.14): Foreground 3D depth highlight layer for extra parallax when tilting phone -->
+      <a-plane 
+        id="aksFrontLayer" 
+        material="shader: luma-key; src: #aksVideo; transparent: true; threshold: 0.35; softness: 0.15; opacity: 0.55; depthWrite: false;" 
+        position="0 0 0.14" 
+        width="1.02" 
+        height="1.456">
+      </a-plane>
     </a-entity>
   </a-scene>
+
   <script>
-    window.addEventListener("load", function () {
-      var video = document.getElementById("aksVideo");
-      var plane = document.getElementById("aksPlane");
-      var target = document.getElementById("aksTarget");
-      function fit() { plane.setAttribute("height", video.videoHeight / video.videoWidth); }
-      if (video.readyState >= 1) { fit(); } else { video.addEventListener("loadedmetadata", fit); }
-      target.addEventListener("targetFound", function () { video.currentTime = 0; video.play(); });
-      target.addEventListener("targetLost", function () { video.pause(); });
+    var video = document.getElementById("aksVideo");
+    var basePlane = document.getElementById("basePlane");
+    var plane = document.getElementById("aksPlane");
+    var frontPlane = document.getElementById("aksFrontLayer");
+    var target = document.getElementById("aksTarget");
+    var container = document.getElementById("smoothContainer");
+    var overlay = document.getElementById("overlay");
+    var startBtn = document.getElementById("startBtn");
+
+    var isTracking = false;
+    var hasPose = false;
+    var lostTimeout = null;
+    var spikeCount = 0;
+
+    var rawPos = new THREE.Vector3();
+    var rawQuat = new THREE.Quaternion();
+    var rawScale = new THREE.Vector3();
+
+    var smoothPos = new THREE.Vector3();
+    var smoothQuat = new THREE.Quaternion();
+    var smoothScale = new THREE.Vector3();
+
+    function fitPlane() {
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        var aspect = video.videoHeight / video.videoWidth;
+        basePlane.setAttribute("height", aspect);
+        plane.setAttribute("height", aspect);
+        frontPlane.setAttribute("height", aspect * 1.02);
+      }
+    }
+
+    video.addEventListener("loadedmetadata", fitPlane);
+    video.addEventListener("loadeddata", fitPlane);
+
+    video.addEventListener("ended", function () {
+      video.pause();
+    });
+
+    startBtn.addEventListener("click", function () {
+      overlay.style.display = "none";
+      video.muted = true;
+      video.play().then(function () {
+        video.pause();
+        video.currentTime = 0.01;
+        fitPlane();
+      }).catch(function () {});
+    });
+
+    target.addEventListener("targetFound", function () {
+      isTracking = true;
+
+      if (lostTimeout) {
+        clearTimeout(lostTimeout);
+        lostTimeout = null;
+        if (!video.ended && video.paused) {
+          video.play();
+        }
+        return;
+      }
+
+      fitPlane();
+      video.muted = true;
+      video.currentTime = 0.01;
+      video.play().catch(function () {});
+    });
+
+    target.addEventListener("targetLost", function () {
+      isTracking = false;
+      if (!video.ended) {
+        video.pause();
+      }
+
+      lostTimeout = setTimeout(function () {
+        lostTimeout = null;
+        hasPose = false;
+        container.object3D.visible = false;
+        video.pause();
+        video.currentTime = 0.01;
+      }, 3000);
+    });
+
+    AFRAME.registerComponent("pose-stabilizer", {
+      tick: function () {
+        if (!isTracking || !target.object3D.visible) return;
+
+        target.object3D.matrix.decompose(rawPos, rawQuat, rawScale);
+        if (rawScale.x <= 0.0001 || Math.abs(rawPos.z) <= 0.001) return;
+
+        if (!hasPose) {
+          smoothPos.copy(rawPos);
+          smoothQuat.copy(rawQuat);
+          smoothScale.copy(rawScale);
+          hasPose = true;
+          spikeCount = 0;
+          container.object3D.visible = true;
+        } else {
+          var depthRef = Math.max(Math.abs(smoothPos.z), 1);
+          var zJump = Math.abs(rawPos.z - smoothPos.z) / depthRef;
+          var xyJump = Math.hypot(rawPos.x - smoothPos.x, rawPos.y - smoothPos.y) / depthRef;
+          var rotJump = rawQuat.angleTo(smoothQuat);
+
+          if (zJump > 0.14 || xyJump > 0.08 || rotJump > 0.25) {
+            spikeCount++;
+            if (spikeCount > 18) {
+              smoothPos.lerp(rawPos, 0.12);
+              smoothQuat.slerp(rawQuat, 0.12);
+              smoothScale.lerp(rawScale, 0.12);
+            }
+          } else {
+            spikeCount = 0;
+            smoothPos.lerp(rawPos, 0.16);
+            smoothQuat.slerp(rawQuat, 0.16);
+            smoothScale.lerp(rawScale, 0.16);
+          }
+        }
+
+        container.object3D.position.copy(smoothPos);
+        container.object3D.quaternion.copy(smoothQuat);
+        container.object3D.scale.copy(smoothScale);
+      }
     });
   </script>
 </body>
